@@ -35,6 +35,7 @@ public class Blake2bGadget extends Gadget {
 	// the key of blake2b in zcash "ZcashComputehSig"
 	private static final BigInteger Key = new BigInteger("5a63617368436f6d7075746568536967", 16);
 	private static final int KeyLenInBytes = 16;
+	private static final BigInteger finalFlags = new BigInteger("FFFFFFFFFFFFFFFF", 16);
 	// for blake2b-256
 	private static final int OutputLengthInBytes = 32;
 
@@ -160,8 +161,7 @@ public class Blake2bGadget extends Gadget {
 		v[13] = v[13].xorBitwise(prepare_t[1], 64, "compress xor v13");
 
 		if (isLastChunk) {
-			Wire invert = generator.createConstantWire(0xFFFFFFFFFFFFFFFFL).trimBits(254, 64);
-			v[14].xorBitwise(invert, 64, "compress last xor v14");
+			v[14].xorBitwise(finalFlags, 64);
 		}
 
 	    //WireArray chunkArray = new WireArray(chunk);
