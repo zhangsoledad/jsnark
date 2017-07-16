@@ -13,8 +13,21 @@ import circuit.structure.WireArray;
 
 public class Blake2bGadget extends Gadget {
 
-	private static final long H[] = { 0xcbbb9d5dc1059ed8L, 0x629a292a367cd507L, 0x9159015a3070dd17L, 0x152fecd8f70e5939L, 0x67332667ffc00b31L, 0x8eb44a8768581511L,
-			0xdb0c2e0d64f98fa7L, 0x47b5481dbefa4fa4L };
+	private static final long H[] = {0xcbbb9d5dc1059ed8L, 0x629a292a367cd507L, 0x9159015a3070dd17L, 0x152fecd8f70e5939L, 0x67332667ffc00b31L, 0x8eb44a8768581511L,
+			0xdb0c2e0d64f98fa7L, 0x47b5481dbefa4fa4L};
+
+	private static final int SIGMA[][] = {
+			{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+			{14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3},
+			{11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4},
+			{7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8},
+			{9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13},
+			{2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9},
+			{12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11},
+			{13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10},
+			{6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5},
+			{10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0}
+	};
 
 	// the key of blake2b in zcash "ZcashComputehSig"
 	// 0x5a63617368436f6d7075746568536967L
@@ -22,7 +35,7 @@ public class Blake2bGadget extends Gadget {
 	private static final long KeyLen = 16;
 
 	private long cBytesCompressed = 0;
-	private	long cBytesRemaining = 0;
+	private long cBytesRemaining = 0;
 
 	private Wire[] unpaddedInputs;
 
@@ -37,7 +50,7 @@ public class Blake2bGadget extends Gadget {
 	private Wire[] output;
 
 	public Blake2bGadget(Wire[] ins, int bitWidthPerInputElement, int totalLengthInBytes, boolean binaryOutput,
-			boolean paddingRequired, String... desc) {
+						 boolean paddingRequired, String... desc) {
 
 		super(desc);
 		if (totalLengthInBytes * 8 > ins.length * bitWidthPerInputElement
@@ -71,7 +84,7 @@ public class Blake2bGadget extends Gadget {
 
 		//h0 ← h0 xor 0x0101kknn
 		//where kk is Key Length (in bytes)
-        //nn is Desired Hash Length (in bytes)
+		//nn is Desired Hash Length (in bytes)
 		long kk = KeyLen;
 		long nn = 32;
 		long tmp = 0x01011020L;
@@ -80,7 +93,7 @@ public class Blake2bGadget extends Gadget {
 
 		//Each time we Compress we record how many bytes have been compressed
 		// cBytesCompressed ← 0
-   		// cBytesRemaining  ← cbMessageLen
+		// cBytesRemaining  ← cbMessageLen
 		cBytesCompressed = 0;
 		cBytesRemaining = totalLengthInBytes;
 
@@ -103,7 +116,7 @@ public class Blake2bGadget extends Gadget {
 			System.arraycopy(preparedInputBits, chunk_index * 128, chunk, 0, 128);
 
 			cBytesCompressed = cBytesCompressed + 128;
-			cBytesRemaining = cBytesRemaining -128;
+			cBytesRemaining = cBytesRemaining - 128;
 			chunk_index = chunk_index + 1;
 			compress(hWires, chunk, false);
 		}
@@ -136,40 +149,63 @@ public class Blake2bGadget extends Gadget {
 		}
 	}
 
-	private Wire compress(Wire[] h, Wire[] chunk, boolean isLastChunk) {
-		long t = cBytesCompressed;
-		Wire[] v = new Wire[h.length];
+	private void compress(Wire[] h, Wire[] chunk, long t, boolean isLastChunk) {
+		Wire[] v = new Wire[16];
+		for (int i = 0; i < 8; i++) {
+			v[i] = h[i];
+		}
+		for (int i = 8; i < 16; i++) {
+			v[i] = H[i - 8];
+		}
 
+		Wire[] prepare_t = new WireArray(t).invAsBits(64);
+
+		v[12] = v[12].xorBitwise(prepare_t[0], 128);
+		v[13] = v[13].xorBitwise(prepare_t[1], 128);
+
+		if (isLastChunk) {
+			Wire invert = generator.createConstantWire(0xFFFFFFFFFFFFFFFFL);
+			v[14].xorBitwise(invert, 128);
+		}
+
+		WireArray chunkArray = new WireArray(chunk);
+
+		Wire[] m = chunkArray.getBits(8);
+
+		for (int i = 0; i < 12; i++) {
+			int[] s = SIGMA[i % 10];
+			mix(v, 0, 4, 8, 12, m, s[0], s[1]);
+			mix(v, 1, 5, 9, 13, m, s[2], s[3]);
+			mix(v, 2, 6, 10, 14, m, s[4], s[5]);
+			mix(v, 3, 7, 11, 15, m, s[6], s[7]);
+
+			mix(v, 0, 5, 10, 15, m, s[8], s[9]);
+			mix(v, 1, 6, 11, 12, m, s[10], s[11]);
+			mix(v, 2, 7, 8, 13, m, s[12], s[13]);
+			mix(v, 3, 4, 9, 14, m, s[14], s[15]);
+		}
+
+		for (int i = 0; i < 8; i++) {
+			h[i] = h[i].xorBitwise(v[i], 128);
+		}
+
+		for (int i = 0; i < 8; i++) {
+			h[i] = h[i].xorBitwise(v[i + 8], 128);
+		}
 	}
 
-	private Wire computeMaj(Wire a, Wire b, Wire c, int numBits) {
+	private void mix(Wire[] v, int a, int b, int c, int d, Wire[] m, int x, int y) {
+		v[a] = v[a].add(v[b]).add(m[x]);
+		v[d] = v[d].xorBitwise(v[a], 128).rotateRight(128, 32);
 
-		Wire[] result = new Wire[numBits];
-		Wire[] aBits = a.getBitWires(numBits).asArray();
-		Wire[] bBits = b.getBitWires(numBits).asArray();
-		Wire[] cBits = c.getBitWires(numBits).asArray();
+		v[c] = v[c].add(v[d]);
+		v[b] = v[b].xorBitwise(v[c], 128).rotateRight(128, 24);
 
-		for (int i = 0; i < numBits; i++) {
-			Wire t1 = aBits[i].mul(bBits[i]);
-			Wire t2 = aBits[i].add(bBits[i]).add(t1.mul(-2));
-			result[i] = t1.add(cBits[i].mul(t2));
-		}
-		return new WireArray(result).packAsBits();
-	}
+		v[a] = v[a].add(v[b]).add(m[y]);
+		v[d] = v[d].xorBitwise(v[a], 128).rotateRight(128, 16);
 
-	private Wire computeCh(Wire a, Wire b, Wire c, int numBits) {
-		Wire[] result = new Wire[numBits];
-
-		Wire[] aBits = a.getBitWires(numBits).asArray();
-		Wire[] bBits = b.getBitWires(numBits).asArray();
-		Wire[] cBits = c.getBitWires(numBits).asArray();
-
-		for (int i = 0; i < numBits; i++) {
-			Wire t1 = bBits[i].sub(cBits[i]);
-			Wire t2 = t1.mul(aBits[i]);
-			result[i] = t2.add(cBits[i]);
-		}
-		return new WireArray(result).packAsBits();
+		v[c] = v[c].add(v[d]);
+		v[b] = v[b].xorBitwise(v[c], 128).rotateRight(128, 63);
 	}
 
 	/**
