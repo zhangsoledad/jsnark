@@ -141,15 +141,14 @@ public class Blake2bGadget extends Gadget {
 			v[i] = generator.createConstantWire(H[i - 8]);
 		}
 
-		Wire[] prepare_t = generator.createConstantWire(t).getBitWires(2).asArray();
-		;
-
-		v[12] = v[12].xorBitwise(prepare_t[0], 128);
-		v[13] = v[13].xorBitwise(prepare_t[1], 128);
+		Wire[] prepare_t = generator.createConstantWire(t).getBitWires(64).asArray();
+		
+		v[12] = v[12].xorBitwise(prepare_t[0], 64);
+		v[13] = v[13].xorBitwise(prepare_t[1], 64);
 
 		if (isLastChunk) {
 			Wire invert = generator.createConstantWire(0xFFFFFFFFFFFFFFFFL);
-			v[14].xorBitwise(invert, 128);
+			v[14].xorBitwise(invert, 64);
 		}
 
 		WireArray chunkArray = new WireArray(chunk);
@@ -170,26 +169,26 @@ public class Blake2bGadget extends Gadget {
 		}
 
 		for (int i = 0; i < 8; i++) {
-			h[i] = h[i].xorBitwise(v[i], 128);
+			h[i] = h[i].xorBitwise(v[i], 64);
 		}
 
 		for (int i = 0; i < 8; i++) {
-			h[i] = h[i].xorBitwise(v[i + 8], 128);
+			h[i] = h[i].xorBitwise(v[i + 8], 64);
 		}
 	}
 
 	private void mix(Wire[] v, int a, int b, int c, int d, Wire[] m, int x, int y) {
 		v[a] = v[a].add(v[b]).add(m[x]);
-		v[d] = v[d].xorBitwise(v[a], 128).rotateRight(128, 32);
+		v[d] = v[d].xorBitwise(v[a], 64).rotateRight(64, 32);
 
 		v[c] = v[c].add(v[d]);
-		v[b] = v[b].xorBitwise(v[c], 128).rotateRight(128, 24);
+		v[b] = v[b].xorBitwise(v[c], 64).rotateRight(64, 24);
 
 		v[a] = v[a].add(v[b]).add(m[y]);
-		v[d] = v[d].xorBitwise(v[a], 128).rotateRight(128, 16);
+		v[d] = v[d].xorBitwise(v[a], 64).rotateRight(64, 16);
 
 		v[c] = v[c].add(v[d]);
-		v[b] = v[b].xorBitwise(v[c], 128).rotateRight(128, 63);
+		v[b] = v[b].xorBitwise(v[c], 64).rotateRight(64, 63);
 	}
 
 	/**
