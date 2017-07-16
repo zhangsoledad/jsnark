@@ -78,6 +78,15 @@ public class Blake2bGadget extends Gadget {
 		long tmp = 0x0101 * 0x10000 + KeyLenInBytes * 0x100 + OutputLengthInBytes;
 		hWires[0] = hWires[0].xorBitwise(tmp, 64, "h0 xor 0x0101kknn");
 
+		//compress key
+		Wire[] key_chunk = generator.generateZeroWireArray(128);
+		Wire[] keyWireBytes = keyWire.getBitWires(KeyLenInBytes * 8).packBitsIntoWords(8);
+		for (int i = 0; i < KeyLenInBytes; i++) {
+			key_chunk[i] = keyWireBytes[KeyLenInBytes- 1 - i];
+			generator.addDebugInstruction(key_chunk[i], "key_chunk"+i);
+		}
+		//compress(hWires, key_chunk, 0, false);
+
 		//Each time we Compress we record how many bytes have been compressed
 		// cBytesCompressed = 0
 		// cBytesRemaining  = cbMessageLen
@@ -89,8 +98,7 @@ public class Blake2bGadget extends Gadget {
 		cBytesRemaining = cBytesRemaining + 128;
 		preparedInputBits = new Wire[cBytesRemaining];
 		Arrays.fill(preparedInputBits, generator.getZeroWire());
-		Wire[] keyWireBytes = keyWire.getBitWires(KeyLenInBytes * 8).packBitsIntoWords(8);
-		System.arraycopy(keyWireBytes, 0, preparedInputBits, 0, KeyLenInBytes);
+		System.arraycopy(key_chunk, 0, preparedInputBits, 0, 128);
 		System.arraycopy(unpaddedInputs, 0, preparedInputBits, 128, totalLengthInBytes);
 
 		// Compress whole 128-byte chunks of the message, except the last chunk
@@ -145,6 +153,8 @@ public class Blake2bGadget extends Gadget {
 		}
 
 		Wire[] prepare_t = generator.createConstantWire(t).getBitWires(128).packBitsIntoWords(64);
+		generator.addDebugInstruction(prepare_t[0], "t0");
+		generator.addDebugInstruction(prepare_t[1], "t1");
 		
 		v[12] = v[12].xorBitwise(prepare_t[0], 64, "compress xor v12");
 		v[13] = v[13].xorBitwise(prepare_t[1], 64, "compress xor v13");
@@ -154,9 +164,18 @@ public class Blake2bGadget extends Gadget {
 			v[14].xorBitwise(invert, 64, "compress last xor v14");
 		}
 
-		WireArray chunkArray = new WireArray(chunk);
-
-		Wire[] m = chunkArray.getBits(8).asArray();
+	    //WireArray chunkArray = new WireArray(chunk);
+		for (int i = 0; i < 16; i++) {
+			generator.addDebugInstruction(chunk[i], "chunk"+i);
+		}
+		Wire[] m = new Wire[16];
+		Arrays.fill(m, generator.getZeroWire());
+		for (int i = 0; i < 16; i++) {
+			for (int j = 0; j < 8; j++) {
+				m[i] = m[i].shiftLeft(64, 8).add(chunk[i * 8 + 8 - 1 - j]).trimBits(65, 64);
+			}
+		}
+		generator.addDebugInstruction(m[0], "m0");
 
 		for (int i = 0; i < 12; i++) {
 			int[] s = SIGMA[i % 10];
@@ -173,7 +192,9 @@ public class Blake2bGadget extends Gadget {
 
 		for (int i = 0; i < 8; i++) {
 			h[i] = h[i].xorBitwise(v[i], 64).xorBitwise(v[i + 8], 64);
+			generator.addDebugInstruction(h[i], "h"+i);
 		}
+
 	}
 
 	private void mix(Wire[] v, int a, int b, int c, int d, Wire[] m, int x, int y) {
