@@ -17,8 +17,8 @@ public class Blake2bGadget extends Gadget {
 			0xdb0c2e0d64f98fa7L, 0x47b5481dbefa4fa4L };
 
 	// the key of blake2b in zcash "ZcashComputehSig"
-	private static final long Key = new BigInteger("5a63617368436f6d7075746568536967", 16);
-	private static final long KeyLenInBytes = 16;
+	private static final BigInteger Key = new BigInteger("5a63617368436f6d7075746568536967", 16);
+	private static final int KeyLenInBytes = 16;
 	// for blake2b-256
 	private static final long OutputLengthInBytes = 32;
 
@@ -59,26 +59,26 @@ public class Blake2bGadget extends Gadget {
 		//h0 ← h0 xor 0x0101kknn
 		//where kk is Key Length (in bytes)
         //nn is Desired Hash Length (in bytes)
-		long tmp = 0x0101 * 0x10000 + KeyLen * 0x100 + OutputLengthInBytes;
+		long tmp = 0x0101 * 0x10000 + KeyLenInBytes * 0x100 + OutputLengthInBytes;
 		Wire tmpWire = generator.createConstantWire(tmp);
 		hWires[0] = hWires[0].xorBitwise(tmpWire, 64);
 
 		//Each time we Compress we record how many bytes have been compressed
 		// cBytesCompressed ← 0
    		// cBytesRemaining  ← cbMessageLen
-		long cBytesCompressed = 0;
-		long cBytesRemaining = totalLengthInBytes;
+		int cBytesCompressed = 0;
+		int cBytesRemaining = totalLengthInBytes;
 
 		// pad with zeros to make key 128-bytes
 		// then prepend it to the message M
 		cBytesRemaining = cBytesRemaining + 128;
 		preparedInputBits = generator.generateZeroWireArray(cBytesRemaining);
-		Wire[] keyWireBytes = new WireArray(keyWire).getBits(bitwidthPerInputElement).asArray();
+		WireArray keyWireBytes = keyWire.getBitWires(bitwidthPerInputElement);
 		System.arraycopy(keyWire, 0, preparedInputBits, 0, KeyLenInBytes);
 		System.arraycopy(unpaddedInputs, 0, preparedInputBits, 128, totalLengthInBytes);
 
 		// Compress whole 128-byte chunks of the message, except the last chunk
-		long chunk_index = 0;
+		int chunk_index = 0;
 		while (cBytesRemaining > 128) {
 			// chunk ← get next 128 bytes of message M
 			Wire[] chunk = generator.generateZeroWireArray(128);
@@ -119,8 +119,8 @@ public class Blake2bGadget extends Gadget {
 		}
 	}
 
-	private Wire compress(Wire[] h, Wire[] chunk, long t, boolean isLastChunk) {
-
+	private Wire compress(Wire[] h, Wire[] chunk, int t, boolean isLastChunk) {
+        return new Wire(0);
 	}
 
 	/**
