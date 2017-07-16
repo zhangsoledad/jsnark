@@ -49,7 +49,7 @@ public class Blake2b_Test extends TestCase {
 
 		String outDigest = "";
 		for (Wire w : generator.getOutWires()) {
-			outDigest += evaluator.getWireValue(w).toString(16);
+			outDigest += Util.padZeros(evaluator.getWireValue(w).toString(16), 2);
 		}
 		assertEquals(outDigest, expectedDigest);
 
@@ -86,7 +86,7 @@ public class Blake2b_Test extends TestCase {
 
 		String outDigest = "";
 		for (Wire w : generator.getOutWires()) {
-			outDigest += evaluator.getWireValue(w).toString(16);
+			outDigest += Util.padZeros(evaluator.getWireValue(w).toString(16), 2);
 		}
 		assertEquals(outDigest, expectedDigest);
 
@@ -123,7 +123,7 @@ public class Blake2b_Test extends TestCase {
 
 		String outDigest = "";
 		for (Wire w : generator.getOutWires()) {
-			outDigest += evaluator.getWireValue(w).toString(16);
+			outDigest += Util.padZeros(evaluator.getWireValue(w).toString(16), 2);
 		}
 		assertEquals(outDigest, expectedDigest);
 
@@ -160,7 +160,7 @@ public class Blake2b_Test extends TestCase {
 
 		String outDigest = "";
 		for (Wire w : generator.getOutWires()) {
-			outDigest += evaluator.getWireValue(w).toString(16);
+			outDigest += Util.padZeros(evaluator.getWireValue(w).toString(16), 2);
 		}
 		assertEquals(outDigest, expectedDigest);
 	}
