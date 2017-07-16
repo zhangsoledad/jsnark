@@ -30,21 +30,15 @@ public class Blake2bGadget extends Gadget {
 	};
 
 	// the key of blake2b in zcash "ZcashComputehSig"
-	// 0x5a63617368436f6d7075746568536967L
-	private static final long Key = new BigInteger("120146533546875585101809381653209114983");
-	private static final long KeyLen = 16;
-
-	private long cBytesCompressed = 0;
-	private long cBytesRemaining = 0;
+	private static final BigInteger Key = new BigInteger("5a63617368436f6d7075746568536967", 16);
+	private static final int KeyLenInBytes = 16;
+	// for blake2b-256
+	private static final long OutputLengthInBytes = 32;
 
 	private Wire[] unpaddedInputs;
 
 	private int bitwidthPerInputElement;
 	private int totalLengthInBytes;
-
-	private int numBlocks;
-	private boolean binaryOutput;
-	private boolean paddingRequired;
 
 	private Wire[] preparedInputBits;
 	private Wire[] output;
@@ -58,16 +52,9 @@ public class Blake2bGadget extends Gadget {
 			throw new IllegalArgumentException("Inconsistent Length Information");
 		}
 
-		if (!paddingRequired && totalLengthInBytes % 64 != 0
-				&& ins.length * bitWidthPerInputElement != totalLengthInBytes) {
-			throw new IllegalArgumentException("When padding is not forced, totalLengthInBytes % 64 must be zero.");
-		}
-
 		this.unpaddedInputs = ins;
 		this.bitwidthPerInputElement = bitWidthPerInputElement;
 		this.totalLengthInBytes = totalLengthInBytes;
-		this.binaryOutput = binaryOutput;
-		this.paddingRequired = paddingRequired;
 
 		buildCircuit();
 
@@ -84,32 +71,27 @@ public class Blake2bGadget extends Gadget {
 
 		//h0 ← h0 xor 0x0101kknn
 		//where kk is Key Length (in bytes)
-		//nn is Desired Hash Length (in bytes)
-		long kk = KeyLen;
-		long nn = 32;
-		long tmp = 0x01011020L;
+        //nn is Desired Hash Length (in bytes)
+		long tmp = 0x0101 * 0x10000 + KeyLenInBytes * 0x100 + OutputLengthInBytes;
 		Wire tmpWire = generator.createConstantWire(tmp);
-		hWires[0] = hWires[0].xorBitwise(tmpWire, 128);
+		hWires[0] = hWires[0].xorBitwise(tmpWire, 64);
 
 		//Each time we Compress we record how many bytes have been compressed
 		// cBytesCompressed ← 0
-		// cBytesRemaining  ← cbMessageLen
-		cBytesCompressed = 0;
-		cBytesRemaining = totalLengthInBytes;
+   		// cBytesRemaining  ← cbMessageLen
+		int cBytesCompressed = 0;
+		int cBytesRemaining = totalLengthInBytes;
 
-		// padding key to 128 bits
+		// pad with zeros to make key 128-bytes
 		// then prepend it to the message M
 		cBytesRemaining = cBytesRemaining + 128;
-
-		Wire[] preparedInputBits = generator.generateZeroWireArray(cBytesRemaining);
-		Wire[] keyWireBits = new WireArray(keyWire).getBits(128).asArray();
-		System.arraycopy(keyWire, 0, preparedInputBits, 0, 128);
+		preparedInputBits = generator.generateZeroWireArray(cBytesRemaining);
+		WireArray keyWireBytes = keyWire.getBitWires(bitwidthPerInputElement);
+		System.arraycopy(keyWire, 0, preparedInputBits, 0, KeyLenInBytes);
 		System.arraycopy(unpaddedInputs, 0, preparedInputBits, 128, totalLengthInBytes);
 
 		// Compress whole 128-byte chunks of the message, except the last chunk
-		long remainLen = cBytesRemaining % 128;
-		long chunk_num = cBytesRemaining / 128;
-		long chunk_index = 0;
+		int chunk_index = 0;
 		while (cBytesRemaining > 128) {
 			// chunk ← get next 128 bytes of message M
 			Wire[] chunk = generator.generateZeroWireArray(128);
@@ -118,7 +100,7 @@ public class Blake2bGadget extends Gadget {
 			cBytesCompressed = cBytesCompressed + 128;
 			cBytesRemaining = cBytesRemaining - 128;
 			chunk_index = chunk_index + 1;
-			compress(hWires, chunk, false);
+			compress(hWires, chunk, cBytesCompressed, false);
 		}
 
 		// padding the last chunk
@@ -126,11 +108,12 @@ public class Blake2bGadget extends Gadget {
 		for (int i = 0; i < 128; i++) {
 			chunk[i] = generator.getZeroWire();
 		}
-		System.arraycopy(preparedInputBits, chunk_num * 128, chunk, 0, remainLen);
+		System.arraycopy(preparedInputBits, chunk_index * 128, chunk, 0, cBytesRemaining);
 		cBytesCompressed = cBytesCompressed + cBytesRemaining;
-		compress(hWires, chunk, true);
+		compress(hWires, chunk, cBytesCompressed, true);
 
 		// first cbHashLen bytes of little endian state vector h
+		// TODO
 		outDigest[0] = hWires[0];
 		outDigest[1] = hWires[1];
 		outDigest[2] = hWires[2];
