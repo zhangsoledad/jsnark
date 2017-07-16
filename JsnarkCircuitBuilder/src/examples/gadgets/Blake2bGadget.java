@@ -69,16 +69,16 @@ public class Blake2bGadget extends Gadget {
 			hWires[i] = generator.createConstantWire(H[i]);
 		}
 
-		//h0 ← h0 xor 0x0101kknn
+		//h0 = h0 xor 0x0101kknn
 		//where kk is Key Length (in bytes)
-        //nn is Desired Hash Length (in bytes)
+		//nn is Desired Hash Length (in bytes)
 		long tmp = 0x0101 * 0x10000 + KeyLenInBytes * 0x100 + OutputLengthInBytes;
 		Wire tmpWire = generator.createConstantWire(tmp);
 		hWires[0] = hWires[0].xorBitwise(tmpWire, 64);
 
 		//Each time we Compress we record how many bytes have been compressed
-		// cBytesCompressed ← 0
-   		// cBytesRemaining  ← cbMessageLen
+		// cBytesCompressed = 0
+		// cBytesRemaining  = cbMessageLen
 		int cBytesCompressed = 0;
 		int cBytesRemaining = totalLengthInBytes;
 
@@ -93,7 +93,7 @@ public class Blake2bGadget extends Gadget {
 		// Compress whole 128-byte chunks of the message, except the last chunk
 		int chunk_index = 0;
 		while (cBytesRemaining > 128) {
-			// chunk ← get next 128 bytes of message M
+			// chunk = get next 128 bytes of message M
 			Wire[] chunk = generator.generateZeroWireArray(128);
 			System.arraycopy(preparedInputBits, chunk_index * 128, chunk, 0, 128);
 
@@ -124,24 +124,25 @@ public class Blake2bGadget extends Gadget {
 
 		output = new Wire[OutputLengthInBytes];
 		//each h is 128 bit or 16 bytes
-		for (int i = 0; i < OutputLengthInBytes/16; i++) {
+		for (int i = 0; i < OutputLengthInBytes / 16; i++) {
 			Wire[] bits = outDigest[i].getBitWires(16).asArray();
 			for (int j = 0; j < 16; j++) {
-				output[j + i * 16] = bits[16-1-j];
+				output[j + i * 16] = bits[16 - 1 - j];
 			}
 		}
 	}
 
-	private void compress(Wire[] h, Wire[] chunk, long t, boolean isLastChunk) {
+	private void compress(Wire[] h, Wire[] chunk, int t, boolean isLastChunk) {
 		Wire[] v = new Wire[16];
 		for (int i = 0; i < 8; i++) {
 			v[i] = h[i];
 		}
 		for (int i = 8; i < 16; i++) {
-			v[i] = H[i - 8];
+			v[i] = generator.createConstantWire(H[i - 8]);
 		}
 
-		Wire[] prepare_t = new WireArray(t).invAsBits(64);
+		Wire[] prepare_t = generator.createConstantWire(t).getBitWires(2).asArray();
+		;
 
 		v[12] = v[12].xorBitwise(prepare_t[0], 128);
 		v[13] = v[13].xorBitwise(prepare_t[1], 128);
@@ -153,7 +154,7 @@ public class Blake2bGadget extends Gadget {
 
 		WireArray chunkArray = new WireArray(chunk);
 
-		Wire[] m = chunkArray.getBits(8);
+		Wire[] m = chunkArray.getBits(8).asArray();
 
 		for (int i = 0; i < 12; i++) {
 			int[] s = SIGMA[i % 10];
