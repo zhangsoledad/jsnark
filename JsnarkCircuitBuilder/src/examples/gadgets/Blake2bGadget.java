@@ -33,7 +33,7 @@ public class Blake2bGadget extends Gadget {
 	private static final BigInteger Key = new BigInteger("5a63617368436f6d7075746568536967", 16);
 	private static final int KeyLenInBytes = 16;
 	// for blake2b-256
-	private static final long OutputLengthInBytes = 32;
+	private static final int OutputLengthInBytes = 32;
 
 	private Wire[] unpaddedInputs;
 
@@ -86,8 +86,8 @@ public class Blake2bGadget extends Gadget {
 		// then prepend it to the message M
 		cBytesRemaining = cBytesRemaining + 128;
 		preparedInputBits = generator.generateZeroWireArray(cBytesRemaining);
-		WireArray keyWireBytes = keyWire.getBitWires(bitwidthPerInputElement);
-		System.arraycopy(keyWire, 0, preparedInputBits, 0, KeyLenInBytes);
+		Wire[] keyWireBytes = keyWire.getBitWires(KeyLenInBytes).asArray();
+		System.arraycopy(keyWireBytes, 0, preparedInputBits, 0, KeyLenInBytes);
 		System.arraycopy(unpaddedInputs, 0, preparedInputBits, 128, totalLengthInBytes);
 
 		// Compress whole 128-byte chunks of the message, except the last chunk
@@ -113,7 +113,6 @@ public class Blake2bGadget extends Gadget {
 		compress(hWires, chunk, cBytesCompressed, true);
 
 		// first cbHashLen bytes of little endian state vector h
-		// TODO
 		outDigest[0] = hWires[0];
 		outDigest[1] = hWires[1];
 		outDigest[2] = hWires[2];
@@ -123,11 +122,12 @@ public class Blake2bGadget extends Gadget {
 		outDigest[6] = hWires[6];
 		outDigest[7] = hWires[7];
 
-		output = new Wire[8 * 32];
-		for (int i = 0; i < 8; i++) {
-			Wire[] bits = outDigest[i].getBitWires(32).asArray();
-			for (int j = 0; j < 32; j++) {
-				output[j + i * 32] = bits[j];
+		output = new Wire[OutputLengthInBytes];
+		//each h is 128 bit or 16 bytes
+		for (int i = 0; i < OutputLengthInBytes/16; i++) {
+			Wire[] bits = outDigest[i].getBitWires(16).asArray();
+			for (int j = 0; j < 16; j++) {
+				output[j + i * 16] = bits[16-1-j];
 			}
 		}
 	}
