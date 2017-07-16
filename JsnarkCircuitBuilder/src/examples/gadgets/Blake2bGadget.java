@@ -85,8 +85,9 @@ public class Blake2bGadget extends Gadget {
 		// pad with zeros to make key 128-bytes
 		// then prepend it to the message M
 		cBytesRemaining = cBytesRemaining + 128;
-		preparedInputBits = generator.generateZeroWireArray(cBytesRemaining);
-		Wire[] keyWireBytes = keyWire.getBitWires(KeyLenInBytes*128).packBitsIntoWords(8);
+		preparedInputBits = new Wire[cBytesRemaining];
+		Arrays.fill(preparedInputBits, generator.getZeroWire());
+		Wire[] keyWireBytes = keyWire.getBitWires(KeyLenInBytes * 8).packBitsIntoWords(8);
 		System.arraycopy(keyWireBytes, 0, preparedInputBits, 0, KeyLenInBytes);
 		System.arraycopy(unpaddedInputs, 0, preparedInputBits, 128, totalLengthInBytes);
 
