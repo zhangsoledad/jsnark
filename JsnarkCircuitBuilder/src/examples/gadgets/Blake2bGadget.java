@@ -161,7 +161,7 @@ public class Blake2bGadget extends Gadget {
 		v[13] = v[13].xorBitwise(prepare_t[1], 64, "compress xor v13");
 
 		if (isLastChunk) {
-			v[14].xorBitwise(finalFlags, 64);
+			v[14] = v[14].xorBitwise(finalFlags, 64);
 		}
 
 	    //WireArray chunkArray = new WireArray(chunk);
@@ -175,7 +175,13 @@ public class Blake2bGadget extends Gadget {
 				m[i] = m[i].shiftLeft(64, 8).add(chunk[i * 8 + 8 - 1 - j]).trimBits(65, 64);
 			}
 		}
-		generator.addDebugInstruction(m[0], "m0");
+		for  (int i = 0; i < 16; i++) {
+			generator.addDebugInstruction(m[i], "m"+i);
+		}
+		for (int i = 0; i < 16; i++) {
+			generator.addDebugInstruction(v[i], "v"+i);
+		}
+
 
 		for (int i = 0; i < 12; i++) {
 			int[] s = SIGMA[i % 10];
@@ -190,11 +196,14 @@ public class Blake2bGadget extends Gadget {
 			mix(v, 3, 4, 9, 14, m, s[14], s[15]);
 		}
 
+		for (int i = 0; i < 16; i++) {
+			generator.addDebugInstruction(v[i], "v"+i);
+		}
+
 		for (int i = 0; i < 8; i++) {
 			h[i] = h[i].xorBitwise(v[i], 64).xorBitwise(v[i + 8], 64);
 			generator.addDebugInstruction(h[i], "h"+i);
 		}
-
 	}
 
 	private void mix(Wire[] v, int a, int b, int c, int d, Wire[] m, int x, int y) {
